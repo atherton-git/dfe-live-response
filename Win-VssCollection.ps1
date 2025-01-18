@@ -43,13 +43,12 @@ $source_files = @(
 )
 $source_dirs = @()
 
-# Add NTUSER.DAT for all users
-$user_accounts = Get-ChildItem C:\Users -Directory -Force | ForEach-Object { $_.Name }
-foreach ($user_account in $user_accounts) {
-    $ntuser_path = Join-Path -Path $user_account -ChildPath "NTUSER.dat"
-    if (Test-Path $ntuser_path) {
-        $source_files += $ntuser_path
-    }
+# Get the list of user accounts as an array
+$user_accounts = @(Get-ChildItem C:\Users -Name)
+
+# Append each user's NTUSER.dat path to $source_files
+foreach ($user in $user_accounts) {
+    $source_files += "C:\Users\$user\NTUSER.dat"
 }
 
 ###############################################################################
@@ -78,6 +77,12 @@ $temp_shadow_link = "C:\shadowcopy_$date"
 $unix_time = Get-Date -UFormat %s -Millisecond 0
 $archive_filename = "$date_$unix_time.zip"
 $temp_archive_full_path = Join-Path -Path $env:TEMP -ChildPath $archive_filename
+$temp_collected_dir = Join-Path -Path $env:TEMP -ChildPath "CollectedFiles_$date"
+
+# Create a temporary directory for collected files
+if (-Not (Test-Path -Path $temp_collected_dir)) {
+    New-Item -Path $temp_collected_dir -ItemType Directory -Force | Out-Null
+}
 
 Write-Log "Creating new shadow copy snapshot." -Level "Info"
 $s1 = (Get-WmiObject -List Win32_ShadowCopy).Create("C:\", "ClientAccessible")
@@ -90,14 +95,12 @@ if (Test-Path -Path $temp_shadow_link) {
 }
 cmd /c mklink /d $temp_shadow_link $d
 
-# Collect files and directories into a temporary list for processing
-$collected_files = @()
-
+# Collect files and directories into the temporary directory
 foreach ($file in $source_files) {
     $shadow_file = $file -replace "^C:", $temp_shadow_link
     if (Test-Path -Path $shadow_file) {
-        Write-Log "Collecting file: $shadow_file" -Level "Info"
-        $collected_files += $shadow_file
+        Write-Log "Copying file to temporary directory: $shadow_file" -Level "Info"
+        Copy-Item -Path $shadow_file -Destination $temp_collected_dir -Force
     } else {
         Write-Log "File not found in shadow copy: $shadow_file" -Level "Warning"
     }
@@ -106,31 +109,29 @@ foreach ($file in $source_files) {
 foreach ($dir in $source_dirs) {
     $shadow_dir = $dir -replace "^C:", $temp_shadow_link
     if (Test-Path -Path $shadow_dir) {
-        Write-Log "Collecting directory: $shadow_dir" -Level "Info"
-        $collected_files += (Get-ChildItem -Path $shadow_dir -Recurse -Force -ErrorAction SilentlyContinue).FullName
+        Write-Log "Copying directory to temporary directory: $shadow_dir" -Level "Info"
+        Copy-Item -Path $shadow_dir -Destination $temp_collected_dir -Recurse -Force
     } else {
         Write-Log "Directory not found in shadow copy: $shadow_dir" -Level "Warning"
     }
 }
 
-# Archive collected files explicitly
-foreach ($item in $collected_files) {
-    if (Test-Path -Path $item) {
-        try {
-            Write-Log "Adding $item to archive." -Level "Info"
-            Compress-Archive -Path $item -DestinationPath $temp_archive_full_path -CompressionLevel Optimal -Update
-        } catch {
-            Write-Log "Failed to add $item to archive. Error: $_" -Level "Error"
-        }
-    } else {
-        Write-Log "Skipping unavailable item: $item" -Level "Warning"
-    }
+# Create the ZIP archive using System.IO.Compression.ZipFile
+try {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    Write-Log "Creating ZIP archive: $temp_archive_full_path" -Level "Info"
+    [System.IO.Compression.ZipFile]::CreateFromDirectory($temp_collected_dir, $temp_archive_full_path)
+} catch {
+    Write-Log "Failed to create ZIP archive. Error: $_" -Level "Error"
 }
 
-# Clean up shadow snapshot and temporary link
+# Clean up shadow snapshot, temporary link, and collected files
 Write-Log "Deleting shadow snapshot and cleaning up temporary link." -Level "Info"
 $s2.Delete()
 cmd /c rmdir $temp_shadow_link
+
+Write-Log "Cleaning up temporary collected files directory." -Level "Info"
+Remove-Item -Path $temp_collected_dir -Recurse -Force
 
 # Move the archive to the target directory
 Write-Log "Moving archive to target directory: $target_dir" -Level "Info"
