@@ -36,13 +36,13 @@ $source_files = @(
 	"C:\Windows\System32\config\SECURITY"
 	"C:\Windows\System32\config\SOFTWARE"
 	"C:\Windows\System32\config\SYSTEM"
-	"C:\Windows\System32\SRUDB.dat"
+	"C:\Windows\System32\sru\SRUDB.dat"
 )
 
 $source_dirs = @(
 	"C:\Windows\System32\winevt\Logs"
 	"C:\Windows\Prefetch"
-	"C:\Windows\System32\SUM"
+	"C:\Windows\System32\LogFiles\SUM"
 )
 
 # Get the list of user accounts as an array
