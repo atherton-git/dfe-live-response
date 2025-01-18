@@ -27,17 +27,18 @@
 
 # Define source files and directories
 $source_files = @(
-    "C:\Windows\appcompat\Programs\Amcache.hve"
-    "C:\Windows\System32\config\BBI"
-    "C:\Windows\System32\config\COMPONENTS"
-    "C:\Windows\System32\config\DRIVERS"
-    "C:\Windows\System32\config\ELAM"
-    "C:\Windows\System32\config\SAM"
-    "C:\Windows\System32\config\SECURITY"
-    "C:\Windows\System32\config\SOFTWARE"
-    "C:\Windows\System32\config\SYSTEM"
-    "C:\Windows\System32\SRUDB.dat"
+	"C:\Windows\appcompat\Programs\Amcache.hve"
+	"C:\Windows\System32\config\BBI"
+	"C:\Windows\System32\config\COMPONENTS"
+	"C:\Windows\System32\config\DRIVERS"
+	"C:\Windows\System32\config\ELAM"
+	"C:\Windows\System32\config\SAM"
+	"C:\Windows\System32\config\SECURITY"
+	"C:\Windows\System32\config\SOFTWARE"
+	"C:\Windows\System32\config\SYSTEM"
+	"C:\Windows\System32\SRUDB.dat"
 )
+
 $source_dirs = @(
 	"C:\Windows\System32\winevt\Logs"
 	"C:\Windows\Prefetch"
