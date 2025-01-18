@@ -27,28 +27,32 @@
 
 # Define source files and directories
 $source_files = @(
-    "C:\Windows\appcompat\Programs\Amcache.hve",
-    "C:\Windows\System32\config\BBI",
-    "C:\Windows\System32\config\COMPONENTS",
-    "C:\Windows\System32\config\DRIVERS",
-    "C:\Windows\System32\config\ELAM",
-    "C:\Windows\System32\config\SAM",
-    "C:\Windows\System32\config\SECURITY",
-    "C:\Windows\System32\config\SOFTWARE",
-    "C:\Windows\System32\config\SYSTEM",
-    "C:\Windows\Prefetch",
-    "C:\Windows\System32\winevt\Logs",
-    "C:\Windows\System32\SRUDB.dat",
-    "C:\Windows\System32\SUM"
+    "C:\Windows\appcompat\Programs\Amcache.hve"
+    "C:\Windows\System32\config\BBI"
+    "C:\Windows\System32\config\COMPONENTS"
+    "C:\Windows\System32\config\DRIVERS"
+    "C:\Windows\System32\config\ELAM"
+    "C:\Windows\System32\config\SAM"
+    "C:\Windows\System32\config\SECURITY"
+    "C:\Windows\System32\config\SOFTWARE"
+    "C:\Windows\System32\config\SYSTEM"
+    "C:\Windows\System32\SRUDB.dat"
 )
-$source_dirs = @()
+$source_dirs = @(
+	"C:\Windows\System32\winevt\Logs"
+	"C:\Windows\Prefetch"
+	"C:\Windows\System32\SUM"
+)
 
 # Get the list of user accounts as an array
 $user_accounts = @(Get-ChildItem C:\Users -Name)
 
 # Append each user's NTUSER.dat path to $source_files
 foreach ($user in $user_accounts) {
-    $source_files += "C:\Users\$user\NTUSER.dat"
+    $source_files += @{
+        Path = "C:\Users\$user\NTUSER.dat"
+        Renamed = "$user`_NTUSER.dat"
+    }
 }
 
 ###############################################################################
@@ -97,12 +101,26 @@ cmd /c mklink /d $temp_shadow_link $d
 
 # Collect files and directories into the temporary directory
 foreach ($file in $source_files) {
-    $shadow_file = $file -replace "^C:", $temp_shadow_link
-    if (Test-Path -Path $shadow_file) {
-        Write-Log "Copying file to temporary directory: $shadow_file" -Level "Info"
-        Copy-Item -Path $shadow_file -Destination $temp_collected_dir -Force
+    if ($file -is [Hashtable]) {
+        # Handle NTUSER.dat files with renaming
+        $shadow_file = $file.Path -replace "^C:", $temp_shadow_link
+        $renamed_file = Join-Path -Path $temp_collected_dir -ChildPath $file.Renamed
+
+        if (Test-Path -Path $shadow_file) {
+            Write-Log "Copying and renaming NTUSER.dat for user: $shadow_file -> $renamed_file" -Level "Info"
+            Copy-Item -Path $shadow_file -Destination $renamed_file -Force
+        } else {
+            Write-Log "NTUSER.dat file not found in shadow copy for user: $shadow_file" -Level "Warning"
+        }
     } else {
-        Write-Log "File not found in shadow copy: $shadow_file" -Level "Warning"
+        # Handle regular files
+        $shadow_file = $file -replace "^C:", $temp_shadow_link
+        if (Test-Path -Path $shadow_file) {
+            Write-Log "Copying file to temporary directory: $shadow_file" -Level "Info"
+            Copy-Item -Path $shadow_file -Destination $temp_collected_dir -Force
+        } else {
+            Write-Log "File not found in shadow copy: $shadow_file" -Level "Warning"
+        }
     }
 }
 
