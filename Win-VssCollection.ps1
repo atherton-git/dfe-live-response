@@ -1,15 +1,15 @@
 <#
 ##################################################################################################################
-# Win-VssRegistry.ps1
+# Win-VssCollector.ps1
 # v1.2
 ##################################################################################################################
 
- _       ___           _    __          ____             _      __            
-| |     / (_)___      | |  / /_________/ __ \___  ____ _(_)____/ /________  __
-| | /| / / / __ \_____| | / / ___/ ___/ /_/ / _ \/ __ / / ___/ __/ ___/ / / /
-| |/ |/ / / / / /_____/ |/ (__  |__  ) _, _/  __/ /_/ / (__  ) /_/ /  / /_/ / 
-|__/|__/_/_/ /_/      |___/____/____/_/ |_|\___/\__, /_/____/\__/_/   \__, /  
-                                               /____/                /____/   
+ _       ___           _    __          ______      ____          __            
+| |     / (_)___      | |  / /_________/ ____/___  / / /__  _____/ /_____  _____
+| | /| / / / __ \_____| | / / ___/ ___/ /   / __ \/ / / _ \/ ___/ __/ __ \/ ___/
+| |/ |/ / / / / /_____/ |/ (__  |__  ) /___/ /_/ / / /  __/ /__/ /_/ /_/ / /    
+|__/|__/_/_/ /_/      |___/____/____/\____/\____/_/_/\___/\___/\__/\____/_/     
+                                                                                
 
 .SYNOPSIS
     This script performs a backup of system artefacts as a ZIP archive, 
@@ -45,6 +45,10 @@ $source_dirs = @(
 	"C:\Windows\System32\LogFiles\SUM"
 )
 
+###############################################################################
+# Collect artefacts with dynamic paths
+###############################################################################
+
 # Get the list of user accounts as an array
 $user_accounts = @(Get-ChildItem C:\Users -Name)
 
@@ -64,9 +68,34 @@ foreach ($user in $user_accounts) {
     }
 }
 
+# Append each user's Edge history path to $source_files
+foreach ($user in $user_accounts) {
+    $source_files += @{
+        Path = "C:\Users\$user\AppData\Local\Microsoft\Edge\User Data\Default\History"
+        Renamed = "$user`_EdgeHistory"
+    }
+}
+
+# Append each user's Lnk files & Jump Lists to $source_dirs
+foreach ($user in $user_accounts) {
+    $source_dirs += @{
+        Path = "C:\Users\$user\AppData\Roaming\Microsoft\Windows\Recent"
+        Renamed = "$user`_LnkFiles"
+    }
+}
+
+# Append each user's Edge artefacts to $source_dirs
+# foreach ($user in $user_accounts) {
+#     $source_dirs += @{
+#         Path = "C:\Users\$user\AppData\Local\Microsoft\Edge\User Data\Default"
+#         Renamed = "$user`_EdgeArtefacts"
+#     }
+# }
+
 ###############################################################################
 # Function: Write-Log
 ###############################################################################
+
 function Write-Log {
     param (
         [string]$Message,
@@ -76,6 +105,8 @@ function Write-Log {
     $logEntry = "[$timestamp] [$Level] $Message"
     Write-Host $logEntry
 }
+
+###############################################################################
 
 $target_dir = "$env:systemdrive\nmc-edr-lr\vss-export"
 $date = Get-Date -Format yyyy-MM-dd
@@ -134,12 +165,26 @@ foreach ($file in $source_files) {
 }
 
 foreach ($dir in $source_dirs) {
-    $shadow_dir = $dir -replace "^C:", $temp_shadow_link
-    if (Test-Path -Path $shadow_dir) {
-        Write-Log "Copying directory to temporary directory: $shadow_dir" -Level "Info"
-        Copy-Item -Path $shadow_dir -Destination $temp_collected_dir -Recurse -Force
+    if ($dir -is [Hashtable]) {
+        # Handle directories with renaming
+        $shadow_dir = $dir.Path -replace "^C:", $temp_shadow_link
+        $renamed_dir = Join-Path -Path $temp_collected_dir -ChildPath $dir.Renamed
+
+        if (Test-Path -Path $shadow_dir) {
+            Write-Log "Copying and renaming directory: $shadow_dir -> $renamed_dir" -Level "Info"
+            Copy-Item -Path $shadow_dir -Destination $renamed_dir -Recurse -Force
+        } else {
+            Write-Log "Directory not found in shadow copy: $shadow_dir" -Level "Warning"
+        }
     } else {
-        Write-Log "Directory not found in shadow copy: $shadow_dir" -Level "Warning"
+        # Handle regular directories
+        $shadow_dir = $dir -replace "^C:", $temp_shadow_link
+        if (Test-Path -Path $shadow_dir) {
+            Write-Log "Copying directory to temporary directory: $shadow_dir" -Level "Info"
+            Copy-Item -Path $shadow_dir -Destination $temp_collected_dir -Recurse -Force
+        } else {
+            Write-Log "Directory not found in shadow copy: $shadow_dir" -Level "Warning"
+        }
     }
 }
 
