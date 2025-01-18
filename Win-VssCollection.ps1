@@ -55,6 +55,14 @@ foreach ($user in $user_accounts) {
     }
 }
 
+# Append each user's UsrClass.dat path to $source_files
+foreach ($user in $user_accounts) {
+    $source_files += @{
+        Path = "C:\Users\$user\AppData\Local\Microsoft\Windows\UsrClass.dat"
+        Renamed = "$user`_UsrClass.dat"
+    }
+}
+
 ###############################################################################
 # Function: Write-Log
 ###############################################################################
