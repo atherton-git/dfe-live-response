@@ -26,15 +26,42 @@
 
 # Define source files and directories
 $source_files = @(
-    "C:\Windows\System32\config\BBI"
-    "C:\Windows\System32\config\COMPONENTS"
-    "C:\Windows\System32\config\DRIVERS"
-    "C:\Windows\System32\config\ELAM"
-    "C:\Windows\System32\config\SAM"
-    "C:\Windows\System32\config\SECURITY"
-    "C:\Windows\System32\config\SOFTWARE"
-    "C:\Windows\System32\config\SYSTEM"
-    "C:\Windows\System32\sru\SRUDB.dat"
+    @{
+        Path      = "C:\Windows\System32\config\BBI"
+        Subfolder = "SystemRegistryFiles"
+    },
+    @{
+        Path      = "C:\Windows\System32\config\COMPONENTS"
+        Subfolder = "SystemRegistryFiles"
+    },
+    @{
+        Path      = "C:\Windows\System32\config\DRIVERS"
+        Subfolder = "SystemRegistryFiles"
+    },
+    @{
+        Path      = "C:\Windows\System32\config\ELAM"
+        Subfolder = "SystemRegistryFiles"
+    },
+    @{
+        Path      = "C:\Windows\System32\config\SAM"
+        Subfolder = "SystemRegistryFiles"
+    },
+    @{
+        Path      = "C:\Windows\System32\config\SECURITY"
+        Subfolder = "SystemRegistryFiles"
+    },
+    @{
+        Path      = "C:\Windows\System32\config\SOFTWARE"
+        Subfolder = "SystemRegistryFiles"
+    },
+    @{
+        Path      = "C:\Windows\System32\config\SYSTEM"
+        Subfolder = "SystemRegistryFiles"
+    },
+    @{
+        Path      = "C:\Windows\System32\sru\SRUDB.dat"
+        Subfolder = "SRU"
+    }
 )
 
 $source_dirs = @(
