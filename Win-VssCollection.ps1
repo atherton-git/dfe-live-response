@@ -27,7 +27,6 @@
 
 # Define source files and directories
 $source_files = @(
-	"C:\Windows\appcompat\Programs\Amcache.hve"
 	"C:\Windows\System32\config\BBI"
 	"C:\Windows\System32\config\COMPONENTS"
 	"C:\Windows\System32\config\DRIVERS"
@@ -40,6 +39,7 @@ $source_files = @(
 )
 
 $source_dirs = @(
+	"C:\Windows\appcompat\Programs"
 	"C:\Windows\System32\winevt\Logs"
 	"C:\Windows\Prefetch"
 	"C:\Windows\System32\LogFiles\SUM"
