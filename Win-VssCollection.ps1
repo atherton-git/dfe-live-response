@@ -50,21 +50,29 @@ $source_dirs = @(
 ###############################################################################
 
 # Get the list of user accounts as an array
-$user_accounts = @(Get-ChildItem C:\Users -Name)
+$user_accounts = @(Get-ChildItem C:\Users -Name -Force)
 
 # Append each user's NTUSER.dat path to $source_files
 foreach ($user in $user_accounts) {
-    $source_files += @{
-        Path = "C:\Users\$user\NTUSER.dat"
-        Renamed = "$user`_NTUSER.dat"
+    $wildcardPath = "C:\Users\$user\NTUSER.dat*"
+    $matchedFiles = Get-ChildItem -Path $wildcardPath -Force -File -ErrorAction SilentlyContinue
+    foreach ($matchedFile in $matchedFiles) {
+        $source_files += @{
+            Path    = $matchedFile.FullName
+            Renamed = "$user`_$($matchedFile.Name)"
+        }
     }
 }
 
 # Append each user's UsrClass.dat path to $source_files
 foreach ($user in $user_accounts) {
-    $source_files += @{
-        Path = "C:\Users\$user\AppData\Local\Microsoft\Windows\UsrClass.dat"
-        Renamed = "$user`_UsrClass.dat"
+    $wildcardPath = "C:\Users\$user\AppData\Local\Microsoft\Windows\UsrClass.dat*"
+    $matchedFiles = Get-ChildItem -Path $wildcardPath -Force -File -ErrorAction SilentlyContinue
+    foreach ($matchedFile in $matchedFiles) {
+        $source_files += @{
+            Path    = $matchedFile.FullName
+            Renamed = "$user`_$($matchedFile.Name)"
+        }
     }
 }
 
@@ -142,21 +150,22 @@ cmd /c mklink /d $temp_shadow_link $d
 # Collect files and directories into the temporary directory
 foreach ($file in $source_files) {
     if ($file -is [Hashtable]) {
-        # Handle NTUSER.dat files with renaming
+        # Handle NTUSER* files with rename
         $shadow_file = $file.Path -replace "^C:", $temp_shadow_link
         $renamed_file = Join-Path -Path $temp_collected_dir -ChildPath $file.Renamed
 
         if (Test-Path -Path $shadow_file) {
-            Write-Log "Copying and renaming NTUSER.dat for user: $shadow_file -> $renamed_file" -Level "Info"
+            Write-Log "Copying and renaming NTUSER.dat-like file for user: $shadow_file -> $renamed_file" -Level "Info"
             Copy-Item -Path $shadow_file -Destination $renamed_file -Force
         } else {
-            Write-Log "NTUSER.dat file not found in shadow copy for user: $shadow_file" -Level "Warning"
+            Write-Log "NTUSER.dat-like file not found in shadow copy: $shadow_file" -Level "Warning"
         }
-    } else {
-        # Handle regular files
+    }
+    else {
+        # Handle any other regular files, if you are mixing them in $source_files
         $shadow_file = $file -replace "^C:", $temp_shadow_link
         if (Test-Path -Path $shadow_file) {
-            Write-Log "Copying file to temporary directory: $shadow_file" -Level "Info"
+            Write-Log "Copying file: $shadow_file" -Level "Info"
             Copy-Item -Path $shadow_file -Destination $temp_collected_dir -Force
         } else {
             Write-Log "File not found in shadow copy: $shadow_file" -Level "Warning"
