@@ -210,3 +210,4 @@ Write-Log "Moving archive to target directory: $target_dir" -Level "Info"
 robocopy $env:TEMP $target_dir $archive_filename /MOVE /R:3 /np
 
 Write-Log "Backup completed successfully at $(Get-Date -Format yyyy-MM-dd_HH:mm:ss)." -Level "Info"
+Write-Log "ZIP archive directory: $temp_archive_full_path" -Level "Info"
