@@ -11,9 +11,10 @@
 |__/|__/_/_/ /_/      |___/____/____/\____/\____/_/_/\___/\___/\__/\____/_/     
 
 .SYNOPSIS
-    This script performs a backup of system artefacts as a ZIP archive, 
-    including open files using the Volume Shadow Copy Service (VSS). The
-    archive is then moved to the target directory.
+    This script performs a backup of system artefacts into a ZIP archive, 
+    including locked files using the Volume Shadow Copy Service (VSS). The
+    archive is then moved to the target directory which can be retrieved via 
+    a DfE Live Response session.
 
 .NOTES
     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
@@ -24,55 +25,48 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #>
 
-# Define source files and directories
-$source_files = @(
-    @{
-        Path      = "C:\Windows\System32\config\BBI"
-        Subfolder = "SystemRegistryFiles"
-    },
-    @{
-        Path      = "C:\Windows\System32\config\COMPONENTS"
-        Subfolder = "SystemRegistryFiles"
-    },
-    @{
-        Path      = "C:\Windows\System32\config\DRIVERS"
-        Subfolder = "SystemRegistryFiles"
-    },
-    @{
-        Path      = "C:\Windows\System32\config\ELAM"
-        Subfolder = "SystemRegistryFiles"
-    },
-    @{
-        Path      = "C:\Windows\System32\config\SAM"
-        Subfolder = "SystemRegistryFiles"
-    },
-    @{
-        Path      = "C:\Windows\System32\config\SECURITY"
-        Subfolder = "SystemRegistryFiles"
-    },
-    @{
-        Path      = "C:\Windows\System32\config\SOFTWARE"
-        Subfolder = "SystemRegistryFiles"
-    },
-    @{
-        Path      = "C:\Windows\System32\config\SYSTEM"
-        Subfolder = "SystemRegistryFiles"
-    },
-    @{
-        Path      = "C:\Windows\System32\sru\SRUDB.dat"
-        Subfolder = "SRU"
-    }
-)
+# Initialise source_files array
+$source_files = @()
 
+# Initialise source_dirs array
 $source_dirs = @(
-    "C:\Windows\appcompat\Programs"
-    "C:\Windows\System32\winevt\Logs"
-    "C:\Windows\Prefetch"
-    "C:\Windows\System32\LogFiles\SUM"
-)
+				"C:\Windows\appcompat\Programs"
+				"C:\Windows\System32\winevt\Logs"
+				"C:\Windows\Prefetch"
+				"C:\Windows\System32\LogFiles\SUM"
+				"C:\Windows\System32\sru"
+				)
+
+# System registry artefacts array
+$registry_paths = @(
+				#"C:\Windows\System32\config\BBI*"
+				"C:\Windows\System32\config\COMPONENTS*"
+				"C:\Windows\System32\config\DRIVERS*"
+				#"C:\Windows\System32\config\ELAM*"
+				"C:\Windows\System32\config\SAM*"
+				"C:\Windows\System32\config\SECURITY*"
+				"C:\Windows\System32\config\SOFTWARE*"
+				"C:\Windows\System32\config\SYSTEM*"
+				)
 
 ###############################################################################
-# Collect artefacts with dynamic paths
+# Collect registry artefacts with static paths
+###############################################################################
+
+foreach ($artefact in $registry_paths) {
+    $matchedFiles = Get-ChildItem -Path $artefact -Force -File -ErrorAction SilentlyContinue
+    
+    foreach ($matchedFile in $matchedFiles) {
+        # Store both the Path (or FullName) and the Subfolder
+        $source_files += @{
+            Path      = $matchedFile.FullName
+            Subfolder = "SystemRegistryFiles"
+        }
+    }
+}
+
+###############################################################################
+# Collect user artefacts with dynamic file paths
 ###############################################################################
 
 # Get the list of user accounts as an array
@@ -85,7 +79,7 @@ foreach ($user in $user_accounts) {
     foreach ($matchedFile in $matchedFiles) {
         $source_files += @{
             Path      = $matchedFile.FullName
-            Renamed   = $matchedFile.Name
+            #Renamed   = $matchedFile.Name
             Subfolder = "$user`_NTUSER"
         }
     }
@@ -98,7 +92,7 @@ foreach ($user in $user_accounts) {
     foreach ($matchedFile in $matchedFiles) {
         $source_files += @{
             Path    = $matchedFile.FullName
-            Renamed = "$user`_$($matchedFile.Name)"
+            #Renamed = "$user`_$($matchedFile.Name)"
             Subfolder = "$user`_UsrClass"
         }
     }
@@ -107,15 +101,18 @@ foreach ($user in $user_accounts) {
 foreach ($user in $user_accounts) {
     $source_files += @{
         Path    = "C:\Users\$user\AppData\Local\Microsoft\Edge\User Data\Default\History"
-        Renamed = "$user`_EdgeHistory"
+        #Renamed = "$user`_EdgeHistory"
         Subfolder = "$user`_EdgeHistory"
     }
 }
 
+###############################################################################
+# Collect user artefacts with dynamic directory paths
+###############################################################################
+
 foreach ($user in $user_accounts) {
     $source_dirs += @{
         Path    = "C:\Users\$user\AppData\Roaming\Microsoft\Windows\Recent"
-        Renamed = "$user`_LnkFiles"
         Subfolder = "$user`_LnkFiles"
     }
 }
@@ -134,6 +131,8 @@ function Write-Log {
     Write-Host $logEntry
 }
 
+###############################################################################
+# Create client accessible volume shadow copy
 ###############################################################################
 
 $target_dir = "$env:systemdrive\nmc-edr-lr\vss-export"
@@ -167,15 +166,15 @@ if (Test-Path -Path $temp_shadow_link) {
 }
 cmd /c mklink /d $temp_shadow_link $d
 
-# -----------------------------------------------------------------------------
-# Collect files into the temporary directory (with subfolders where specified)
-# -----------------------------------------------------------------------------
+###############################################################################
+# Collect files into the temporary directory
+###############################################################################
 
 foreach ($file in $source_files) {
 
     if ($file -is [Hashtable]) {
 
-        # Convert the original "C:\..." path into the shadow path
+        # Convert the original path into the shadow path
         $shadow_file = $file.Path -replace "^C:", $temp_shadow_link
 
         if (Test-Path -Path $shadow_file) {
@@ -213,16 +212,16 @@ foreach ($file in $source_files) {
     }
 }
 
-# -----------------------------------------------------------------------------
-# Collect directories into the temporary directory (with rename if specified)
-# -----------------------------------------------------------------------------
+###############################################################################
+# Collect directories into the temporary directory
+###############################################################################
 
 foreach ($dir in $source_dirs) {
 
     if ($dir -is [Hashtable]) {
         # Handle directories with rename
         $shadow_dir = $dir.Path -replace "^C:", $temp_shadow_link
-        $renamed_dir = Join-Path -Path $temp_collected_dir -ChildPath $dir.Renamed
+        $renamed_dir = Join-Path -Path $temp_collected_dir -ChildPath $dir.Subfolder
 
         if (Test-Path -Path $shadow_dir) {
             Write-Log "Copying and renaming directory: $shadow_dir -> $renamed_dir" -Level "Info"
@@ -244,9 +243,9 @@ foreach ($dir in $source_dirs) {
     }
 }
 
-# -----------------------------------------------------------------------------
+###############################################################################
 # Create the ZIP archive using System.IO.Compression.ZipFile
-# -----------------------------------------------------------------------------
+###############################################################################
 
 try {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -257,9 +256,9 @@ catch {
     Write-Log "Failed to create ZIP archive. Error: $_" -Level "Error"
 }
 
-# -----------------------------------------------------------------------------
+###############################################################################
 # Clean up shadow snapshot, temporary link, and collected files
-# -----------------------------------------------------------------------------
+###############################################################################
 
 Write-Log "Deleting shadow snapshot and cleaning up temporary link." -Level "Info"
 $s2.Delete()
